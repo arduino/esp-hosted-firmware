@@ -1,0 +1,37 @@
+From 7844ec5c08512272cc3b2c04e67ca54c3ad3db82 Mon Sep 17 00:00:00 2001
+From: iabdalkader <i.abdalkader@gmail.com>
+Date: Mon, 31 Aug 2026 19:40:46 +0200
+Subject: [PATCH 3/4] network_adapter: Do not start the station at boot.
+
+Starting the station at boot fires WIFI_EVENT_STA_START, whose handler
+calls esp_wifi_connect() with the credentials stored in flash. Every
+failed attempt reconnects again from the WIFI_EVENT_STA_DISCONNECTED
+handler, so a slave holding stale credentials retries forever.
+
+Scan and disconnect requests are rejected while one of those attempts is
+in flight, which leaves the host unable to scan.
+
+Boot in WIFI_MODE_NULL, as the 0.0.5 firmware did, and leave the mode to
+the host or to the scan handler, which selects one itself.
+
+Signed-off-by: iabdalkader <i.abdalkader@gmail.com>
+---
+ .../esp_driver/network_adapter/main/esp_hosted_coprocessor.c    | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/esp_hosted_fg/esp/esp_driver/network_adapter/main/esp_hosted_coprocessor.c b/esp_hosted_fg/esp/esp_driver/network_adapter/main/esp_hosted_coprocessor.c
+index 9cd0272..de63c5b 100644
+--- a/esp_hosted_fg/esp/esp_driver/network_adapter/main/esp_hosted_coprocessor.c
++++ b/esp_hosted_fg/esp/esp_driver/network_adapter/main/esp_hosted_coprocessor.c
+@@ -656,7 +656,7 @@ static int connect_sta(void)
+ 
+ 	ESP_ERROR_CHECK(esp_hosted_wifi_init(&cfg));
+ 
+-	ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA) );
++	ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_NULL) );
+ 
+ #if CONFIG_WIFI_CMD_DEFAULT_COUNTRY_CN
+ 	/* Only set country once during first initialize wifi */
+-- 
+2.55.0
+

@@ -9,7 +9,7 @@ on:
 
 jobs:
   build:
-    name: '🏗️ Build ${{ matrix.target }} (${{ matrix.esp_hosted_version }})'
+    name: '🏗️ Build ${{ matrix.target }} (${{ matrix.patches }})'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -18,13 +18,15 @@ jobs:
           - target: portenta_c33
             esp_chip: esp32c3
             esp_hosted_ref: release/fg-1.0.0.0.0
-            esp_hosted_version: v1.0.0.0.0
+            patches: latest
             esp_idf_ref: release/v5.4
 
           - target: portenta_c33
             esp_chip: esp32c3
             esp_hosted_ref: fe0b10584417629908cee8141699c2f35ea05a25
-            esp_hosted_version: v0.0.5
+            patches: legacy
+            # No esp_fw_version.h at this ref, so the version cannot be derived.
+            version: v0.0.5
             esp_idf_ref: release/v5.1
 
     steps:
@@ -50,13 +52,33 @@ jobs:
       - name: '🩹 Apply patches'
         working-directory: esp-hosted
         run: |
-          PATCHES_DIR="${{ github.workspace }}/${{ matrix.target }}/${{ matrix.esp_hosted_version }}/patches"
+          PATCHES_DIR="${{ github.workspace }}/${{ matrix.target }}/${{ matrix.patches }}/patches"
+          COUNT=0
           if [ -d "$PATCHES_DIR" ]; then
             for patch in "$PATCHES_DIR"/*.patch; do
               echo "🩹 Applying $(basename $patch)..."
               patch -p1 < "$patch"
+              COUNT=$((COUNT + 1))
             done
           fi
+          echo "PATCH_COUNT=$COUNT" >> "$GITHUB_ENV"
+
+      - name: '🔖 Resolve firmware version'
+        working-directory: esp-hosted
+        run: |
+          # The last version field counts the patches applied on top of the
+          # upstream release, so a patched build never reports itself as stock.
+          HEADER="esp_hosted_fg/common/include/esp_fw_version.h"
+          VERSION="${{ matrix.version }}"
+          if [ -z "$VERSION" ]; then
+            sed -i -E "s/^(#define[ \t]+PROJECT_REVISION_PATCH_2[ \t]+)[0-9]+/\1${PATCH_COUNT}/" "$HEADER"
+            field() { grep -E "^#define[ \t]+$1[ \t]" "$HEADER" | awk '{print $3}'; }
+            VERSION="v$(field PROJECT_VERSION_MAJOR_1).$(field PROJECT_VERSION_MAJOR_2)"
+            VERSION="$VERSION.$(field PROJECT_VERSION_MINOR).$(field PROJECT_REVISION_PATCH_1)"
+            VERSION="$VERSION.$(field PROJECT_REVISION_PATCH_2)"
+          fi
+          echo "🔖 Firmware version: $VERSION (${PATCH_COUNT} patches)"
+          echo "FW_VERSION=$VERSION" >> "$GITHUB_ENV"
 
       - name: '🛠️ Setup ESP-IDF'
         working-directory: esp-idf
@@ -67,19 +89,19 @@ jobs:
           source esp-idf/export.sh
           cd esp-hosted/esp_hosted_fg/esp/esp_driver/network_adapter
           idf.py set-target ${{ matrix.esp_chip }}
-          cp "${{ github.workspace }}/${{ matrix.target }}/${{ matrix.esp_hosted_version }}/sdkconfig.defaults.${{ matrix.esp_chip }}" \
+          cp "${{ github.workspace }}/${{ matrix.target }}/${{ matrix.patches }}/sdkconfig.defaults.${{ matrix.esp_chip }}" \
              sdkconfig.defaults.${{ matrix.esp_chip }}
           rm -f sdkconfig
           idf.py build
 
       - name: '📦 Combine binaries'
-        run: python3 tools/combine.py ${{ matrix.target }} ${{ matrix.esp_hosted_version }}
+        run: python3 tools/combine.py ${{ matrix.target }} $FW_VERSION
 
       - name: '⬆️ Upload artifact'
         uses: actions/upload-artifact@v4
         with:
-          name: firmware-${{ matrix.target }}-${{ matrix.esp_hosted_version }}
-          path: ${{ matrix.target }}-${{ matrix.esp_hosted_version }}.bin
+          name: firmware-${{ matrix.target }}-${{ env.FW_VERSION }}
+          path: ${{ matrix.target }}-${{ env.FW_VERSION }}.bin
 
   release:
     name: '🚀 Create Release'
