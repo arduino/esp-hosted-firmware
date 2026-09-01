@@ -1,3 +1,7 @@
+# Copyright (C) Arduino s.r.l. and/or its affiliated companies
+#
+# SPDX-License-Identifier: Apache-2.0
+
 name: '🔧 Build ESP-Hosted Firmware'
 
 on:
@@ -101,7 +105,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: firmware-${{ matrix.target }}-${{ env.FW_VERSION }}
-          path: ${{ matrix.target }}-${{ env.FW_VERSION }}.bin
+          path: |
+            ${{ matrix.target }}-${{ env.FW_VERSION }}.bin
+            LICENSE
 
   release:
     name: '🚀 Create Release'
@@ -120,5 +126,5 @@ jobs:
       - name: '🎉 Create Release'
         uses: softprops/action-gh-release@v2
         with:
-          files: firmware/*.bin
+          files: firmware/*
           generate_release_notes: true
