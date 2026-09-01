@@ -1,5 +1,9 @@
 #!/usr/bin/python3
 
+# Copyright (C) Arduino s.r.l. and/or its affiliated companies
+#
+# SPDX-License-Identifier: Apache-2.0
+
 import argparse
 
 parser = argparse.ArgumentParser(description='Combine ESP-Hosted firmware binaries')

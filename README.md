@@ -47,3 +47,16 @@ esptool.py --chip esp32c3 -p /dev/ttyACM0 -b 230400 \
   --before=default_reset --after=hard_reset --no-stub \
   write_flash --flash_mode dio --flash_freq 80m 0x0 <target>-<version>.bin
 ```
+
+## 📄 License
+
+The patches under `<target>/<patch-set>/patches/` are modifications to
+[esp-hosted](https://github.com/espressif/esp-hosted). The files they touch live
+under `esp_hosted_fg/esp`, which upstream licenses as Apache-2.0, so the patches
+and the firmware built from them are Apache-2.0. See `LICENSE`, which is also
+published with the release binaries.
+
+The released image is produced by ESP-IDF and also contains the IDF bootloader
+and Espressif's pre-compiled WiFi and Bluetooth libraries, which carry their own
+licenses. See the [ESP-IDF
+license](https://github.com/espressif/esp-idf/blob/master/LICENSE) for those.
